@@ -136,13 +136,27 @@ export class ListSourcesHandler extends BaseHandler {
   }
 
   private renderTree(node: TreeNode, prefix: string, lines: string[]) {
-    for (const [name, child] of node.children.entries()) {
+    const entries = Array.from(node.children.entries()).sort(([nameA], [nameB]) => {
+      // Sort folders before files, then alphabetically
+      const isAFolder = node.children.get(nameA)?.isFolder || false;
+      const isBFolder = node.children.get(nameB)?.isFolder || false;
+      if (isAFolder !== isBFolder) {
+        return isAFolder ? -1 : 1;
+      }
+      return nameA.localeCompare(nameB);
+    });
+
+    entries.forEach(([name, child], index) => {
+      const isLast = index === entries.length - 1;
       const icon = child.isFolder ? '📁' : '📄';
-      lines.push(`${prefix}${prefix ? '  ' : ''}${icon} ${name}`);
+      const connector = isLast ? '└──' : '├──';
+      const newPrefix = prefix + (isLast ? '    ' : '│   ');
+      
+      lines.push(`${prefix}${connector} ${icon} ${name}`);
       
       if (child.children.size > 0) {
-        this.renderTree(child, `${prefix}${prefix ? '  ' : ''}`, lines);
+        this.renderTree(child, newPrefix, lines);
       }
-    }
+    });
   }
 } 

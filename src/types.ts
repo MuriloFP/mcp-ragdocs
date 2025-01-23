@@ -12,6 +12,7 @@ export interface DocumentChunk {
   parent_folder?: string;    // e.g., 'docs/api'
   is_folder?: boolean;       // true for directory entries
   depth?: number;           // nesting level, 0 for root
+  _type?: 'DocumentChunk';  // type identifier for the document
 }
 
 export interface DocumentPayload extends DocumentChunk {
@@ -54,7 +55,6 @@ export function isDocumentPayload(payload: unknown): payload is DocumentPayload 
   if (!payload || typeof payload !== 'object') return false;
   const p = payload as Partial<DocumentPayload>;
   return (
-    p._type === 'DocumentChunk' &&
     typeof p.text === 'string' &&
     typeof p.url === 'string' &&
     typeof p.title === 'string' &&

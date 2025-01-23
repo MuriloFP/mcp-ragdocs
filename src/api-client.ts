@@ -279,27 +279,26 @@ export class ApiClient {
       
       // If this is the root call, set baseDir
       if (!baseDir) {
-        baseDir = normalizedPath;
+        baseDir = path.dirname(normalizedPath);
       }
 
       // Create folder entry
       const relativePath = path.relative(baseDir, normalizedPath);
-      const pathSegments = relativePath ? relativePath.split(path.sep) : [];
-      const parentFolder = pathSegments.length > 1 ? pathSegments.slice(0, -1).join('/') : '';
+      const pathSegments = [path.basename(normalizedPath)];  // Always include the current folder name
+      const parentFolder = '';  // Root folder has no parent
       
-      // Add folder document
-      if (relativePath) {
-        allChunks.push({
-          text: `Directory: ${relativePath}`,
-          url: `file://${normalizedPath}`,
-          title: path.basename(normalizedPath),
-          timestamp: new Date().toISOString(),
-          path_segments: pathSegments,
-          parent_folder: parentFolder,
-          is_folder: true,
-          depth: currentDepth
-        });
-      }
+      // Always add folder document, even for root
+      allChunks.push({
+        text: `Directory: ${path.basename(normalizedPath)}`,
+        url: `file://${normalizedPath}`,
+        title: path.basename(normalizedPath),
+        timestamp: new Date().toISOString(),
+        path_segments: pathSegments,
+        parent_folder: parentFolder,
+        is_folder: true,
+        depth: currentDepth,
+        _type: 'DocumentChunk' as const
+      });
 
       const files = await fs.readdir(normalizedPath);
       
@@ -347,7 +346,8 @@ export class ApiClient {
         path_segments: pathSegments,
         parent_folder: parentFolder,
         is_folder: false,
-        depth
+        depth,
+        _type: 'DocumentChunk' as const
       }));
     } catch (error) {
       throw new McpError(
