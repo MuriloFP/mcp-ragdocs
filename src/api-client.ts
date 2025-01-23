@@ -14,7 +14,7 @@ const TIMEOUT_MS = 10000; // 10 seconds timeout for requests
 export class ApiClient {
   private qdrantClient: QdrantClient;
   private embeddingService: EmbeddingService;
-  browser: Browser | null = null;
+  private browser: Browser | null = null;
 
   constructor() {
     const QDRANT_URL = process.env.QDRANT_URL;
@@ -61,6 +61,10 @@ export class ApiClient {
       model,
       apiKey: openaiKey
     });
+  }
+
+  getBrowser(): Browser | null {
+    return this.browser;
   }
 
   async cleanup() {
@@ -268,45 +272,49 @@ export class ApiClient {
     return chunks;
   }
 
-  async processLocalFile(filePath: string): Promise<DocumentChunk[]> {
-    try {
-      const content = await fs.readFile(filePath, 'utf-8');
-      const fileName = path.basename(filePath);
-      
-      // Split content into chunks
-      const chunks = this.chunkText(content, 1000);
-      
-      return chunks.map(chunk => ({
-        text: chunk,
-        url: `file://${filePath}`,
-        title: fileName,
-        timestamp: new Date().toISOString(),
-      }));
-    } catch (error) {
-      throw new McpError(
-        ErrorCode.InternalError,
-        `Failed to process file ${filePath}: ${error}`
-      );
-    }
-  }
-
-  async processLocalDirectory(dirPath: string): Promise<DocumentChunk[]> {
+  async processLocalDirectory(dirPath: string, baseDir?: string, currentDepth = 0): Promise<DocumentChunk[]> {
     try {
       const allChunks: DocumentChunk[] = [];
-      const files = await fs.readdir(dirPath);
+      const normalizedPath = path.normalize(dirPath);
+      
+      // If this is the root call, set baseDir
+      if (!baseDir) {
+        baseDir = normalizedPath;
+      }
+
+      // Create folder entry
+      const relativePath = path.relative(baseDir, normalizedPath);
+      const pathSegments = relativePath ? relativePath.split(path.sep) : [];
+      const parentFolder = pathSegments.length > 1 ? pathSegments.slice(0, -1).join('/') : '';
+      
+      // Add folder document
+      if (relativePath) {
+        allChunks.push({
+          text: `Directory: ${relativePath}`,
+          url: `file://${normalizedPath}`,
+          title: path.basename(normalizedPath),
+          timestamp: new Date().toISOString(),
+          path_segments: pathSegments,
+          parent_folder: parentFolder,
+          is_folder: true,
+          depth: currentDepth
+        });
+      }
+
+      const files = await fs.readdir(normalizedPath);
       
       for (const file of files) {
-        const fullPath = path.join(dirPath, file);
+        const fullPath = path.resolve(normalizedPath, file);
         const stats = await fs.stat(fullPath);
         
         if (stats.isFile()) {
           // Only process text files
-          if (file.match(/\.(txt|md|js|ts|py|java|c|cpp|h|hpp|json|yaml|yml|xml|html|css|sql)$/i)) {
-            const chunks = await this.processLocalFile(fullPath);
-            allChunks.push(...chunks);
+          if (file.toLowerCase().match(/\.(txt|md|mdx|markdown|js|jsx|ts|tsx|py|java|c|cpp|h|hpp|json|yaml|yml|xml|html|htm|css|sql|log|conf|ini|sh|bash|zsh|ps1|bat|cmd)$/)) {
+            const fileChunks = await this.processLocalFile(fullPath, baseDir, currentDepth + 1);
+            allChunks.push(...fileChunks);
           }
         } else if (stats.isDirectory()) {
-          const subDirChunks = await this.processLocalDirectory(fullPath);
+          const subDirChunks = await this.processLocalDirectory(fullPath, baseDir, currentDepth + 1);
           allChunks.push(...subDirChunks);
         }
       }
@@ -318,5 +326,38 @@ export class ApiClient {
         `Failed to process directory ${dirPath}: ${error instanceof Error ? error.message : String(error)}`
       );
     }
+  }
+
+  async processLocalFile(filePath: string, baseDir?: string, depth = 0): Promise<DocumentChunk[]> {
+    try {
+      const content = await fs.readFile(filePath, 'utf-8');
+      const normalizedPath = path.normalize(filePath);
+      const relativePath = baseDir ? path.relative(baseDir, normalizedPath) : normalizedPath;
+      const pathSegments = relativePath.split(path.sep);
+      const parentFolder = pathSegments.length > 1 ? pathSegments.slice(0, -1).join('/') : '';
+      
+      // Split content into chunks
+      const chunks = this.chunkText(content, 1000);
+      
+      return chunks.map(chunk => ({
+        text: chunk,
+        url: `file://${normalizedPath}`,
+        title: path.basename(normalizedPath),
+        timestamp: new Date().toISOString(),
+        path_segments: pathSegments,
+        parent_folder: parentFolder,
+        is_folder: false,
+        depth
+      }));
+    } catch (error) {
+      throw new McpError(
+        ErrorCode.InternalError,
+        `Failed to process file ${filePath}: ${error}`
+      );
+    }
+  }
+
+  getEmbeddingService(): EmbeddingService {
+    return this.embeddingService;
   }
 } 

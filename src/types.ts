@@ -1,12 +1,17 @@
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { Browser } from 'playwright';
+import { EmbeddingService } from './embeddings.js';
 
 export interface DocumentChunk {
   text: string;
   url: string;
   title: string;
   timestamp: string;
+  path_segments?: string[];  // e.g., ['docs', 'api', 'v1']
+  parent_folder?: string;    // e.g., 'docs/api'
+  is_folder?: boolean;       // true for directory entries
+  depth?: number;           // nesting level, 0 for root
 }
 
 export interface DocumentPayload extends DocumentChunk {
@@ -41,6 +46,7 @@ export interface HandlerContext {
     processLocalDirectory: (dirPath: string) => Promise<DocumentChunk[]>;
     initBrowser: () => Promise<void>;
     browser: Browser | null;
+    getEmbeddingService: () => EmbeddingService;
   };
 }
 

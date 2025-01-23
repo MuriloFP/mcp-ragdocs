@@ -12,6 +12,7 @@ import { AddLocalDocumentationHandler } from './handlers/add-local-documentation
 import { SearchDocumentationHandler } from './handlers/search-documentation-handler.js';
 import { ListSourcesHandler } from './handlers/list-sources-handler.js';
 import { ExtractUrlsHandler } from './handlers/extract-urls-handler.js';
+import { WipeDatabaseHandler } from './handlers/wipe-database-handler.js';
 
 const COLLECTION_NAME = 'documentation';
 
@@ -33,7 +34,8 @@ export class HandlerRegistry {
         processLocalFile: (filePath: string) => apiClient.processLocalFile(filePath),
         processLocalDirectory: (dirPath: string) => apiClient.processLocalDirectory(dirPath),
         initBrowser: () => apiClient.initBrowser(),
-        get browser() { return apiClient.browser; },
+        get browser() { return apiClient.getBrowser(); },
+        getEmbeddingService: () => apiClient.getEmbeddingService(),
       },
     };
     this.handlers = new Map();
@@ -47,6 +49,7 @@ export class HandlerRegistry {
     this.handlers.set('search_documentation', new SearchDocumentationHandler(this.context));
     this.handlers.set('list_sources', new ListSourcesHandler(this.context));
     this.handlers.set('extract_urls', new ExtractUrlsHandler(this.context));
+    this.handlers.set('wipe_database', new WipeDatabaseHandler(this.context));
   }
 
   private registerHandlers() {
@@ -68,13 +71,13 @@ export class HandlerRegistry {
         },
         {
           name: 'add_local_documentation',
-          description: 'Add documentation from a local file or directory to the RAG database. This tool processes local files into chunks suitable for semantic search and stores them in the vector database. Supports multiple file formats including markdown, text, and source code files. When processing directories, it recursively handles all supported files while maintaining proper context and relationships.',
+          description: 'Add documentation from a local file or directory to the RAG database. This tool processes local files into chunks suitable for semantic search and stores them in the vector database. Uses the aboslute path to the file or directory as the path parameter.',
           inputSchema: {
             type: 'object',
             properties: {
               path: {
                 type: 'string',
-                description: 'Absolute or relative path to the local file or directory to process. For directories, all supported file types will be processed recursively.',
+                description: 'Absolute path to the local file or directory to process. For directories, all supported file types will be processed recursively.',
               },
             },
             required: ['path'],
@@ -124,6 +127,15 @@ export class HandlerRegistry {
               },
             },
             required: ['url'],
+          },
+        },
+        {
+          name: 'wipe_database',
+          description: 'Wipe the entire RAG database, removing all stored documentation. This action cannot be undone. The database will be reinitialized with empty collections after wiping.',
+          inputSchema: {
+            type: 'object',
+            properties: {},
+            additionalProperties: false,
           },
         },
       ],

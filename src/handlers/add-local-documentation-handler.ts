@@ -21,12 +21,16 @@ export class AddLocalDocumentationHandler extends BaseHandler {
         );
       }
 
-      const chunks = await this.context.apiClient.processLocalFile(path);
+      // Check if path is a directory or file
+      const stats = await fs.stat(path);
+      const chunks = stats.isDirectory() 
+        ? await this.context.apiClient.processLocalDirectory(path)
+        : await this.context.apiClient.processLocalFile(path);
       
       if (chunks.length === 0) {
         throw new McpError(
           ErrorCode.InternalError,
-          `No content could be extracted from ${path}. The file might be empty or in an unsupported format.`
+          `No content could be extracted from ${path}. The ${stats.isDirectory() ? 'directory might be empty or contain no supported files' : 'file might be empty or in an unsupported format'}.`
         );
       }
       
