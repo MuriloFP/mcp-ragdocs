@@ -42,6 +42,7 @@ MCPspecification.txt
 # Local development folders
 mcp-server-qdrant/
 
-# study folders
+# study/reference folders
 fetch-mcp/
 hannes-mcp-ragdocs/
+docs/

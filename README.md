@@ -1,5 +1,11 @@
 # MCP-Ragdocs
 
+> This project incorporates code from:
+> - [mcp-ragdocs](https://github.com/qpd-v/mcp-ragdocs) (Apache License 2.0)
+> - [hannesrudolph/mcp-ragdocs](https://github.com/hannesrudolph/mcp-ragdocs) (MIT License)
+>
+> Enhanced with improved architecture, error handling, and new features. See the [NOTICE](NOTICE) file for details about modifications and original attribution.
+
 A Model Context Protocol (MCP) server that enables semantic search and retrieval of documentation using a vector database (Qdrant). This server allows you to add documentation from URLs or local files and then search through them using natural language queries.
 
 ## Version

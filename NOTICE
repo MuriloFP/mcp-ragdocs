@@ -1,0 +1,21 @@
+MCP RAG Docs
+Copyright 2024 [MFPires]
+
+This software includes code derived from:
+
+1. mcp-ragdocs project
+(original version copyright [qpd-v], licensed under Apache License 2.0)
+
+2. hannesrudolph/mcp-ragdocs
+(https://github.com/hannesrudolph/mcp-ragdocs, licensed under MIT License)
+
+The following significant enhancements have been made:
+- Complete code reorganization into a modular architecture
+- Enhanced error handling and input validation
+- Improved tool descriptions and documentation
+- New codebase indexing capabilities
+- Performance optimizations and better maintainability
+
+For the original projects, see:
+- Original: https://github.com/qpd-v/mcp-ragdocs
+- Fork: https://github.com/hannesrudolph/mcp-ragdocs
