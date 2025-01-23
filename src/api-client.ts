@@ -1,6 +1,6 @@
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
-import { chromium } from 'playwright';
+import { chromium, Browser } from 'playwright';
 import * as cheerio from 'cheerio';
 import axios from 'axios';
 import crypto from 'crypto';
@@ -14,7 +14,7 @@ const TIMEOUT_MS = 10000; // 10 seconds timeout for requests
 export class ApiClient {
   private qdrantClient: QdrantClient;
   private embeddingService: EmbeddingService;
-  private browser: any;
+  browser: Browser | null = null;
 
   constructor() {
     const QDRANT_URL = process.env.QDRANT_URL;
@@ -66,6 +66,24 @@ export class ApiClient {
   async cleanup() {
     if (this.browser) {
       await this.browser.close();
+      this.browser = null;
+    }
+  }
+
+  async initBrowser() {
+    if (!this.browser) {
+      try {
+        this.browser = await chromium.launch({
+          headless: true,
+          args: ['--no-sandbox', '--disable-setuid-sandbox']
+        });
+      } catch (error) {
+        console.error('Failed to initialize browser:', error);
+        throw new McpError(
+          ErrorCode.InternalError,
+          `Failed to initialize browser: ${error}`
+        );
+      }
     }
   }
 

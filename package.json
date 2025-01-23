@@ -3,6 +3,7 @@
   "version": "0.1.6",
   "description": "A Model Context Protocol server for fetching and storing documentation in a vector database, enabling semantic search and retrieval to augment LLM capabilities with relevant documentation context.",
   "private": false,
+  "type": "module",
   "bin": {
     "@qpd-v/mcp-server-ragdocs": "./build/index.js"
   },
@@ -39,13 +40,13 @@
   },
   "homepage": "https://github.com/qpd-v/mcp-server-ragdocs#readme",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "0.6.0",
-    "@qdrant/js-client-rest": "^1.8.0",
+    "@modelcontextprotocol/sdk": "1.0.3",
+    "@qdrant/js-client-rest": "1.12.0",
     "axios": "^1.7.9",
     "cheerio": "^1.0.0",
     "ollama": "^0.5.11",
     "openai": "^4.76.2",
-    "playwright": "^1.49.1"
+    "playwright": "^1.50.0"
   },
   "devDependencies": {
     "@types/node": "^20.17.14",

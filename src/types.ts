@@ -1,5 +1,6 @@
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { Browser } from 'playwright';
 
 export interface DocumentChunk {
   text: string;
@@ -38,6 +39,8 @@ export interface HandlerContext {
     fetchAndProcessUrl: (url: string) => Promise<DocumentChunk[]>;
     processLocalFile: (filePath: string) => Promise<DocumentChunk[]>;
     processLocalDirectory: (dirPath: string) => Promise<DocumentChunk[]>;
+    initBrowser: () => Promise<void>;
+    browser: Browser | null;
   };
 }
 

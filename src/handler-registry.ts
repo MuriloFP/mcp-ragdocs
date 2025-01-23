@@ -11,6 +11,7 @@ import { AddUrlDocumentationHandler } from './handlers/add-url-documentation-han
 import { AddLocalDocumentationHandler } from './handlers/add-local-documentation-handler.js';
 import { SearchDocumentationHandler } from './handlers/search-documentation-handler.js';
 import { ListSourcesHandler } from './handlers/list-sources-handler.js';
+import { ExtractUrlsHandler } from './handlers/extract-urls-handler.js';
 
 const COLLECTION_NAME = 'documentation';
 
@@ -31,6 +32,8 @@ export class HandlerRegistry {
         fetchAndProcessUrl: (url: string) => apiClient.fetchAndProcessUrl(url),
         processLocalFile: (filePath: string) => apiClient.processLocalFile(filePath),
         processLocalDirectory: (dirPath: string) => apiClient.processLocalDirectory(dirPath),
+        initBrowser: () => apiClient.initBrowser(),
+        get browser() { return apiClient.browser; },
       },
     };
     this.handlers = new Map();
@@ -43,6 +46,7 @@ export class HandlerRegistry {
     this.handlers.set('add_local_documentation', new AddLocalDocumentationHandler(this.context));
     this.handlers.set('search_documentation', new SearchDocumentationHandler(this.context));
     this.handlers.set('list_sources', new ListSourcesHandler(this.context));
+    this.handlers.set('extract_urls', new ExtractUrlsHandler(this.context));
   }
 
   private registerHandlers() {
@@ -101,6 +105,25 @@ export class HandlerRegistry {
           inputSchema: {
             type: 'object',
             properties: {},
+          },
+        },
+        {
+          name: 'extract_urls',
+          description: 'Extract and analyze all URLs from a given web page. This tool crawls the specified webpage, identifies all hyperlinks, and optionally adds them to the processing queue. Useful for discovering related documentation pages, API references, or building a documentation graph. Handles various URL formats and validates links before extraction.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              url: {
+                type: 'string',
+                description: 'The complete URL of the webpage to analyze (must include protocol, e.g., https://). The page must be publicly accessible.',
+              },
+              add_to_queue: {
+                type: 'boolean',
+                description: 'If true, automatically add extracted URLs to the processing queue for later indexing. This enables recursive documentation discovery. Use with caution on large sites to avoid excessive queuing.',
+                default: false,
+              },
+            },
+            required: ['url'],
           },
         },
       ],
