@@ -23,9 +23,9 @@ export class ListQueueHandler extends BaseHandler {
 
       // Read queue file
       const content = await fs.readFile(QUEUE_FILE, 'utf-8');
-      const urls = content.split('\n').filter(url => url.trim() !== '');
+      const items = content.split('\n').filter(item => item.trim() !== '');
 
-      if (urls.length === 0) {
+      if (items.length === 0) {
         return {
           content: [
             {
@@ -40,7 +40,7 @@ export class ListQueueHandler extends BaseHandler {
         content: [
           {
             type: 'text',
-            text: `Queue contains ${urls.length} URLs:\n${urls.join('\n')}`,
+            text: `📋 Queue contains ${items.length} item${items.length !== 1 ? 's' : ''}:\n${items.map(item => `  • ${item}`).join('\n')}`,
           },
         ],
       };

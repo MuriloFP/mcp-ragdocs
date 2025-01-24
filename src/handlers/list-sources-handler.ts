@@ -81,7 +81,7 @@ export class ListSourcesHandler extends BaseHandler {
       const lines: string[] = [];
       
       if (urlSources.length > 0) {
-        lines.push('Web Documentation Sources:');
+        lines.push('🌐 Web Documentation Sources:');
         lines.push('');
 
         // Group URLs by domain
@@ -96,16 +96,18 @@ export class ListSourcesHandler extends BaseHandler {
             domainGroups.set(domain, group);
           } catch {
             // If URL parsing fails, treat it as a standalone entry
-            lines.push(`  • ${source.title}`);
+            lines.push(`  • 📚 ${source.title}`);
             lines.push(`    ${source.url}`);
           }
         }
 
         // Display grouped URLs
         for (const [domain, sources] of domainGroups) {
-          // Use the first source's title as the main title, removing any page-specific information
-          const baseTitle = sources[0].title.split(' - ')[0].split(' | ')[0].trim();
-          lines.push(`  • ${baseTitle}`);
+          // Find the source that matches the base domain URL
+          const baseSource = sources.find(s => s.url === domain) || sources[0];
+          // Use the base source's title, removing any page-specific information
+          const baseTitle = baseSource.title.split(' - ')[0].split(' | ')[0].trim();
+          lines.push(`  • 📚 ${baseTitle}`);
           lines.push(`    ${domain}`);
           
           // If expanded, show all URLs under this domain

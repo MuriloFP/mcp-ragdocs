@@ -6,6 +6,17 @@ import { AddLocalDocumentationHandler } from './add-local-documentation-handler.
 
 const QUEUE_FILE = path.join(process.cwd(), 'queue.txt');
 
+interface ProcessResult {
+  completed: number;
+  failed: number;
+  errors: Array<{
+    item: string;
+    error: string;
+    attempts: number;
+  }>;
+  startTime: number;
+}
+
 export class RunQueueHandler extends BaseHandler {
   private addUrlHandler: AddUrlDocumentationHandler;
   private addLocalHandler: AddLocalDocumentationHandler;
@@ -26,8 +37,38 @@ export class RunQueueHandler extends BaseHandler {
     }
   }
 
-  async handle(_args: Record<string, unknown>) {
+  private formatResult(result: ProcessResult): string {
+    const elapsed = Math.floor((Date.now() - result.startTime) / 1000);
+    const minutes = Math.floor(elapsed / 60);
+    const seconds = elapsed % 60;
+    
+    let output = `⏱️ Total processing time: ${minutes}m ${seconds}s\n`;
+    output += `✅ Completed: ${result.completed}\n`;
+    output += `❌ Failed: ${result.failed}\n`;
+    
+    if (result.errors.length > 0) {
+      output += '\n⚠️ Failed items:\n';
+      output += result.errors.map(e => 
+        `  • ${e.item} (${e.attempts} attempt${e.attempts !== 1 ? 's' : ''}): ${e.error}`
+      ).join('\n');
+    }
+
+    return output;
+  }
+
+  async handle(args: Record<string, unknown>) {
     try {
+      const maxConcurrent = Math.min(Number(args.maxConcurrent) || 3, 5);
+      const retryAttempts = Math.min(Number(args.retryAttempts) || 3, 5);
+      const retryDelay = Math.min(Number(args.retryDelay) || 1000, 10000);
+
+      const result: ProcessResult = {
+        completed: 0,
+        failed: 0,
+        errors: [],
+        startTime: Date.now()
+      };
+
       // Check if queue file exists
       try {
         await fs.access(QUEUE_FILE);
@@ -42,10 +83,6 @@ export class RunQueueHandler extends BaseHandler {
         };
       }
 
-      let processedCount = 0;
-      let failedCount = 0;
-      const failedItems: Array<{path: string; error: string}> = [];
-
       while (true) {
         // Read current queue
         const content = await fs.readFile(QUEUE_FILE, 'utf-8');
@@ -55,46 +92,70 @@ export class RunQueueHandler extends BaseHandler {
           break; // Queue is empty
         }
 
-        const currentItem = items[0];
+        // Take up to maxConcurrent items
+        const batch = items.slice(0, maxConcurrent);
         
         try {
-          // Determine if it's a web URL or local path
-          if (this.isWebUrl(currentItem)) {
-            await this.addUrlHandler.handle({ url: currentItem });
-          } else {
-            // Verify the local path exists
-            try {
-              await fs.access(currentItem);
-              await this.addLocalHandler.handle({ path: currentItem });
-            } catch (error) {
-              throw new Error(`Local path does not exist or is not accessible: ${currentItem}`);
+          // Process items in parallel
+          const batchResults = await Promise.all(
+            batch.map(async item => {
+              let lastError: Error | null = null;
+              let attempts = 0;
+              
+              for (let attempt = 1; attempt <= retryAttempts; attempt++) {
+                attempts = attempt;
+                try {
+                  if (this.isWebUrl(item)) {
+                    await this.addUrlHandler.handle({ url: item });
+                  } else {
+                    await fs.access(item);
+                    await this.addLocalHandler.handle({ path: item });
+                  }
+                  return { success: true, item };
+                } catch (error) {
+                  lastError = error as Error;
+                  if (attempt < retryAttempts) {
+                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                  }
+                }
+              }
+              
+              return { 
+                success: false, 
+                item, 
+                error: String(lastError?.message || 'Unknown error'),
+                attempts: attempts || 1
+              };
+            })
+          );
+
+          // Update counts and track failures
+          for (const batchResult of batchResults) {
+            if (batchResult.success) {
+              result.completed++;
+            } else {
+              result.failed++;
+              result.errors.push({
+                item: batchResult.item,
+                error: batchResult.error || 'Unknown error',
+                attempts: batchResult.attempts || 1
+              });
             }
           }
-          processedCount++;
+
+          // Remove processed items from queue
+          const remainingItems = items.slice(batch.length);
+          await fs.writeFile(QUEUE_FILE, remainingItems.join('\n') + (remainingItems.length > 0 ? '\n' : ''));
         } catch (error) {
-          failedCount++;
-          failedItems.push({
-            path: currentItem,
-            error: error instanceof Error ? error.message : String(error)
-          });
-          console.error(`Failed to process item ${currentItem}:`, error);
+          throw error;
         }
-
-        // Remove the processed item from queue
-        const remainingItems = items.slice(1);
-        await fs.writeFile(QUEUE_FILE, remainingItems.join('\n') + (remainingItems.length > 0 ? '\n' : ''));
-      }
-
-      let resultText = `Queue processing complete.\nProcessed: ${processedCount} items\nFailed: ${failedCount} items`;
-      if (failedItems.length > 0) {
-        resultText += `\n\nFailed items:\n${failedItems.map(item => `${item.path} (${item.error})`).join('\n')}`;
       }
 
       return {
         content: [
           {
             type: 'text',
-            text: resultText,
+            text: this.formatResult(result),
           },
         ],
       };

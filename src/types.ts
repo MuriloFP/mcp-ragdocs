@@ -37,6 +37,32 @@ export interface QdrantCollectionInfo {
   config: QdrantCollectionConfig;
 }
 
+export interface QueueConfig {
+  maxConcurrent: number;     // Maximum items to process in parallel
+  retryAttempts: number;     // Number of retry attempts for failed items
+  retryDelay: number;        // Delay between retries in ms
+}
+
+export interface BatchConfig {
+  maxBatchSize: number;      // Maximum chunks per batch
+  maxTokens: number;         // Maximum tokens per batch
+  chunkOverlap: number;      // Overlap between chunks
+}
+
+export interface QueueProgress {
+  totalItems: number;        // Total items in queue
+  processing: string[];      // Currently processing items
+  completed: number;         // Number of completed items
+  failed: number;           // Number of failed items
+  errors: Array<{           // Detailed error information
+    item: string;
+    error: string;
+    attempts: number;
+  }>;
+  startTime: number;        // When processing started
+  estimatedTimeRemaining?: number; // Estimated time remaining in ms
+}
+
 export interface HandlerContext {
   server: Server;
   qdrantClient: QdrantClient;

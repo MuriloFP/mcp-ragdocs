@@ -206,7 +206,36 @@ export class HandlerRegistry {
           description: 'Process and index all URLs currently in the documentation queue. Each URL is processed sequentially, with proper error handling and retry logic. Progress updates are provided as processing occurs. Long-running operations will process until the queue is empty or an unrecoverable error occurs.',
           inputSchema: {
             type: 'object',
-            properties: {},
+            properties: {
+              maxConcurrent: {
+                type: 'number',
+                description: 'Maximum number of items to process in parallel (1-5). Higher values may process faster but use more resources.',
+                minimum: 1,
+                maximum: 5,
+                default: 3
+              },
+              retryAttempts: {
+                type: 'number',
+                description: 'Number of times to retry failed items before giving up.',
+                minimum: 0,
+                maximum: 5,
+                default: 3
+              },
+              retryDelay: {
+                type: 'number',
+                description: 'Delay in milliseconds between retry attempts.',
+                minimum: 1000,
+                maximum: 10000,
+                default: 1000
+              },
+              batchSize: {
+                type: 'number',
+                description: 'Maximum number of text chunks to process in a single embedding batch.',
+                minimum: 1,
+                maximum: 100,
+                default: 20
+              }
+            }
           },
         },
         {
