@@ -14,6 +14,9 @@ import { ListSourcesHandler } from './handlers/list-sources-handler.js';
 import { ExtractUrlsHandler } from './handlers/extract-urls-handler.js';
 import { WipeDatabaseHandler } from './handlers/wipe-database-handler.js';
 import { RemoveDocumentationHandler } from './handlers/remove-documentation-handler.js';
+import { ListQueueHandler } from './handlers/list-queue-handler.js';
+import { RunQueueHandler } from './handlers/run-queue-handler.js';
+import { ClearQueueHandler } from './handlers/clear-queue-handler.js';
 
 const COLLECTION_NAME = 'documentation';
 
@@ -52,6 +55,9 @@ export class HandlerRegistry {
     this.handlers.set('extract_urls', new ExtractUrlsHandler(this.context));
     this.handlers.set('wipe_database', new WipeDatabaseHandler(this.context));
     this.handlers.set('remove_documentation', new RemoveDocumentationHandler(this.context));
+    this.handlers.set('list_queue', new ListQueueHandler(this.context));
+    this.handlers.set('run_queue', new RunQueueHandler(this.context));
+    this.handlers.set('clear_queue', new ClearQueueHandler(this.context));
   }
 
   private registerHandlers() {
@@ -142,33 +148,46 @@ export class HandlerRegistry {
         },
         {
           name: 'remove_documentation',
-          description: 'Remove specific documentation sources from the system by their URLs or file paths. Use this tool to clean up outdated documentation, remove incorrect sources, or manage the documentation collection. The removal is permanent and will affect future search results. Supports removing multiple URLs or file paths in a single operation.',
+          description: 'Remove specific documentation from the database. This action cannot be undone.',
           inputSchema: {
             type: 'object',
             properties: {
-              urls: {
-                type: 'array',
-                items: {
-                  type: 'string',
-                  description: 'The complete URL of the documentation source to remove. Must exactly match the URL used when the documentation was added.',
-                },
-                description: 'Array of URLs to remove from the database',
-              },
               paths: {
                 type: 'array',
                 items: {
                   type: 'string',
-                  description: 'The file path (relative or absolute) of the documentation to remove. For files with duplicate names, absolute paths must be used.',
+                  description: 'Path to the documentation to remove. Can be relative or absolute.',
                 },
-                description: 'Array of file paths to remove from the database',
+                description: 'Array of paths to remove from the database',
               },
             },
-            anyOf: [
-              { required: ['urls'] },
-              { required: ['paths'] }
-            ],
+            required: ['paths'],
           },
         },
+        {
+          name: 'list_queue',
+          description: 'List all URLs currently waiting in the documentation processing queue. Shows pending documentation sources that will be processed when run_queue is called. Use this to monitor queue status, verify URLs were added correctly, or check processing backlog.',
+          inputSchema: {
+            type: 'object',
+            properties: {},
+          },
+        },
+        {
+          name: 'run_queue',
+          description: 'Process and index all URLs currently in the documentation queue. Each URL is processed sequentially, with proper error handling and retry logic. Progress updates are provided as processing occurs. Long-running operations will process until the queue is empty or an unrecoverable error occurs.',
+          inputSchema: {
+            type: 'object',
+            properties: {},
+          },
+        },
+        {
+          name: 'clear_queue',
+          description: 'Remove all pending URLs from the documentation processing queue. Use this to reset the queue when you want to start fresh, remove unwanted URLs, or cancel pending processing. This operation is immediate and permanent - URLs will need to be re-added if you want to process them later.',
+          inputSchema: {
+            type: 'object',
+            properties: {},
+          },
+        }
       ],
     }));
 
