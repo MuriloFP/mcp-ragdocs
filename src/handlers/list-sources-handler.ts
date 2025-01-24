@@ -151,6 +151,20 @@ export class ListSourcesHandler extends BaseHandler {
       const icon = child.isFolder ? '📁' : '📄';
       const connector = isLast ? '└──' : '├──';
       const newPrefix = prefix + (isLast ? '    ' : '│   ');
+
+      // Check if this is a folder with only folders as children (no files)
+      const hasOnlyFolderChildren = child.isFolder && 
+        Array.from(child.children.values()).every(grandchild => grandchild.isFolder);
+      
+      // If this is a folder with only folder children and it's not empty, use "..."
+      if (hasOnlyFolderChildren && child.children.size > 0) {
+        const lastDescendant = this.findFirstFolderWithFiles(child);
+        if (lastDescendant) {
+          lines.push(`${prefix}...📁${lastDescendant.name}`);
+          this.renderTree(lastDescendant, newPrefix, lines);
+          return;
+        }
+      }
       
       lines.push(`${prefix}${connector} ${icon} ${name}`);
       
@@ -158,5 +172,25 @@ export class ListSourcesHandler extends BaseHandler {
         this.renderTree(child, newPrefix, lines);
       }
     });
+  }
+
+  private findFirstFolderWithFiles(node: TreeNode): TreeNode | null {
+    // If this folder contains any files directly, return it
+    const hasFiles = Array.from(node.children.values()).some(child => !child.isFolder);
+    if (hasFiles) {
+      return node;
+    }
+
+    // Otherwise, recursively check children
+    for (const child of node.children.values()) {
+      if (child.isFolder) {
+        const result = this.findFirstFolderWithFiles(child);
+        if (result) {
+          return result;
+        }
+      }
+    }
+
+    return null;
   }
 } 

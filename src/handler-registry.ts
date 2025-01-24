@@ -17,6 +17,8 @@ import { RemoveDocumentationHandler } from './handlers/remove-documentation-hand
 import { ListQueueHandler } from './handlers/list-queue-handler.js';
 import { RunQueueHandler } from './handlers/run-queue-handler.js';
 import { ClearQueueHandler } from './handlers/clear-queue-handler.js';
+import { CheckFilesHandler } from './handlers/check-files-handler.js';
+import { RemoveFromQueueHandler } from './handlers/remove-from-queue-handler.js';
 
 const COLLECTION_NAME = 'documentation';
 
@@ -58,6 +60,8 @@ export class HandlerRegistry {
     this.handlers.set('list_queue', new ListQueueHandler(this.context));
     this.handlers.set('run_queue', new RunQueueHandler(this.context));
     this.handlers.set('clear_queue', new ClearQueueHandler(this.context));
+    this.handlers.set('check_files', new CheckFilesHandler(this.context));
+    this.handlers.set('remove_from_queue', new RemoveFromQueueHandler(this.context));
   }
 
   private registerHandlers() {
@@ -138,6 +142,25 @@ export class HandlerRegistry {
           },
         },
         {
+          name: 'check_files',
+          description: 'Scan a local file or directory and list all files found. Can optionally add the found files to the processing queue. Similar to extract_urls but for local filesystem.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              path: {
+                type: 'string',
+                description: 'Absolute path to the file or directory to scan. For directories, all files will be listed recursively.',
+              },
+              add_to_queue: {
+                type: 'boolean',
+                description: 'If true, automatically add found files to the processing queue for later indexing.',
+                default: false,
+              },
+            },
+            required: ['path'],
+          },
+        },
+        {
           name: 'wipe_database',
           description: 'Wipe the entire RAG database, removing all stored documentation. This action cannot be undone. The database will be reinitialized with empty collections after wiping.',
           inputSchema: {
@@ -186,6 +209,24 @@ export class HandlerRegistry {
           inputSchema: {
             type: 'object',
             properties: {},
+          },
+        },
+        {
+          name: 'remove_from_queue',
+          description: 'Remove one or more items from the documentation processing queue. Items can be URLs or local file paths.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              paths: {
+                type: 'array',
+                items: {
+                  type: 'string',
+                  description: 'URL or file path to remove from the queue. Must match exactly (but case-insensitive suggestions are provided if no exact match is found).',
+                },
+                description: 'Array of URLs or file paths to remove from the queue.',
+              },
+            },
+            required: ['paths'],
           },
         }
       ],

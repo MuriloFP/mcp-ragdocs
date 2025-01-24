@@ -2,15 +2,28 @@ import { BaseHandler } from './base-handler.js';
 import fs from 'fs/promises';
 import path from 'path';
 import { AddUrlDocumentationHandler } from './add-url-documentation-handler.js';
+import { AddLocalDocumentationHandler } from './add-local-documentation-handler.js';
 
 const QUEUE_FILE = path.join(process.cwd(), 'queue.txt');
 
 export class RunQueueHandler extends BaseHandler {
-  private addDocHandler: AddUrlDocumentationHandler;
+  private addUrlHandler: AddUrlDocumentationHandler;
+  private addLocalHandler: AddLocalDocumentationHandler;
 
   constructor(context: any) {
     super(context);
-    this.addDocHandler = new AddUrlDocumentationHandler(context);
+    this.addUrlHandler = new AddUrlDocumentationHandler(context);
+    this.addLocalHandler = new AddLocalDocumentationHandler(context);
+  }
+
+  private isWebUrl(str: string): boolean {
+    try {
+      const url = new URL(str);
+      // Only consider it a web URL if it uses http/https protocol
+      return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+      return false;
+    }
   }
 
   async handle(_args: Record<string, unknown>) {
@@ -31,37 +44,50 @@ export class RunQueueHandler extends BaseHandler {
 
       let processedCount = 0;
       let failedCount = 0;
-      const failedUrls: string[] = [];
+      const failedItems: Array<{path: string; error: string}> = [];
 
       while (true) {
         // Read current queue
         const content = await fs.readFile(QUEUE_FILE, 'utf-8');
-        const urls = content.split('\n').filter(url => url.trim() !== '');
+        const items = content.split('\n').filter(item => item.trim() !== '');
 
-        if (urls.length === 0) {
+        if (items.length === 0) {
           break; // Queue is empty
         }
 
-        const currentUrl = urls[0]; // Get first URL
+        const currentItem = items[0];
         
         try {
-          // Process the URL using add_documentation handler
-          await this.addDocHandler.handle({ url: currentUrl });
+          // Determine if it's a web URL or local path
+          if (this.isWebUrl(currentItem)) {
+            await this.addUrlHandler.handle({ url: currentItem });
+          } else {
+            // Verify the local path exists
+            try {
+              await fs.access(currentItem);
+              await this.addLocalHandler.handle({ path: currentItem });
+            } catch (error) {
+              throw new Error(`Local path does not exist or is not accessible: ${currentItem}`);
+            }
+          }
           processedCount++;
         } catch (error) {
           failedCount++;
-          failedUrls.push(currentUrl);
-          console.error(`Failed to process URL ${currentUrl}:`, error);
+          failedItems.push({
+            path: currentItem,
+            error: error instanceof Error ? error.message : String(error)
+          });
+          console.error(`Failed to process item ${currentItem}:`, error);
         }
 
-        // Remove the processed URL from queue
-        const remainingUrls = urls.slice(1);
-        await fs.writeFile(QUEUE_FILE, remainingUrls.join('\n') + (remainingUrls.length > 0 ? '\n' : ''));
+        // Remove the processed item from queue
+        const remainingItems = items.slice(1);
+        await fs.writeFile(QUEUE_FILE, remainingItems.join('\n') + (remainingItems.length > 0 ? '\n' : ''));
       }
 
-      let resultText = `Queue processing complete.\nProcessed: ${processedCount} URLs\nFailed: ${failedCount} URLs`;
-      if (failedUrls.length > 0) {
-        resultText += `\n\nFailed URLs:\n${failedUrls.join('\n')}`;
+      let resultText = `Queue processing complete.\nProcessed: ${processedCount} items\nFailed: ${failedCount} items`;
+      if (failedItems.length > 0) {
+        resultText += `\n\nFailed items:\n${failedItems.map(item => `${item.path} (${item.error})`).join('\n')}`;
       }
 
       return {
