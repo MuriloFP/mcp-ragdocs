@@ -13,6 +13,7 @@ import { SearchDocumentationHandler } from './handlers/search-documentation-hand
 import { ListSourcesHandler } from './handlers/list-sources-handler.js';
 import { ExtractUrlsHandler } from './handlers/extract-urls-handler.js';
 import { WipeDatabaseHandler } from './handlers/wipe-database-handler.js';
+import { RemoveDocumentationHandler } from './handlers/remove-documentation-handler.js';
 
 const COLLECTION_NAME = 'documentation';
 
@@ -50,6 +51,7 @@ export class HandlerRegistry {
     this.handlers.set('list_sources', new ListSourcesHandler(this.context));
     this.handlers.set('extract_urls', new ExtractUrlsHandler(this.context));
     this.handlers.set('wipe_database', new WipeDatabaseHandler(this.context));
+    this.handlers.set('remove_documentation', new RemoveDocumentationHandler(this.context));
   }
 
   private registerHandlers() {
@@ -136,6 +138,35 @@ export class HandlerRegistry {
             type: 'object',
             properties: {},
             additionalProperties: false,
+          },
+        },
+        {
+          name: 'remove_documentation',
+          description: 'Remove specific documentation sources from the system by their URLs or file paths. Use this tool to clean up outdated documentation, remove incorrect sources, or manage the documentation collection. The removal is permanent and will affect future search results. Supports removing multiple URLs or file paths in a single operation.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              urls: {
+                type: 'array',
+                items: {
+                  type: 'string',
+                  description: 'The complete URL of the documentation source to remove. Must exactly match the URL used when the documentation was added.',
+                },
+                description: 'Array of URLs to remove from the database',
+              },
+              paths: {
+                type: 'array',
+                items: {
+                  type: 'string',
+                  description: 'The file path (relative or absolute) of the documentation to remove. For files with duplicate names, absolute paths must be used.',
+                },
+                description: 'Array of file paths to remove from the database',
+              },
+            },
+            anyOf: [
+              { required: ['urls'] },
+              { required: ['paths'] }
+            ],
           },
         },
       ],
