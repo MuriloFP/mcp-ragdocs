@@ -25,6 +25,7 @@ interface TreeNode {
 export class ListSourcesHandler extends BaseHandler {
   async handle(args: Record<string, unknown>) {
     try {
+      const expanded = args.expanded as boolean || false;
       const urlSources: Source[] = [];
       const localSources: Source[] = [];
       let hasMore = true;
@@ -82,10 +83,41 @@ export class ListSourcesHandler extends BaseHandler {
       if (urlSources.length > 0) {
         lines.push('Web Documentation Sources:');
         lines.push('');
+
+        // Group URLs by domain
+        const domainGroups = new Map<string, Source[]>();
+        
         for (const source of urlSources) {
-          lines.push(`  • ${source.title}`);
-          lines.push(`    ${source.url}`);
+          try {
+            const url = new URL(source.url);
+            const domain = `${url.protocol}//${url.hostname}/`;
+            const group = domainGroups.get(domain) || [];
+            group.push(source);
+            domainGroups.set(domain, group);
+          } catch {
+            // If URL parsing fails, treat it as a standalone entry
+            lines.push(`  • ${source.title}`);
+            lines.push(`    ${source.url}`);
+          }
         }
+
+        // Display grouped URLs
+        for (const [domain, sources] of domainGroups) {
+          // Use the first source's title as the main title, removing any page-specific information
+          const baseTitle = sources[0].title.split(' - ')[0].split(' | ')[0].trim();
+          lines.push(`  • ${baseTitle}`);
+          lines.push(`    ${domain}`);
+          
+          // If expanded, show all URLs under this domain
+          if (expanded && sources.length > 1) {
+            for (const source of sources) {
+              // Skip if it's the same as the domain
+              if (source.url === domain) continue;
+              lines.push(`      - ${source.url}`);
+            }
+          }
+        }
+        
         lines.push('');
       }
 

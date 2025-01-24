@@ -116,10 +116,16 @@ export class HandlerRegistry {
         },
         {
           name: 'list_sources',
-          description: 'List all documentation sources currently stored in the system. Returns a comprehensive list of all indexed documentation including source URLs, titles, and last update times. Use this to understand what documentation is available for searching or to verify if specific sources have been indexed.',
+          description: 'List all documentation sources currently stored in the system. Returns a comprehensive list of all indexed documentation including source URLs, titles, and last update times. By default shows a condensed view with grouped URLs, but can show expanded details with the expanded flag. Use this to understand what documentation is available for searching or to verify if specific sources have been indexed.',
           inputSchema: {
             type: 'object',
-            properties: {},
+            properties: {
+              expanded: {
+                type: 'boolean',
+                description: 'If true, shows all URLs under each domain. If false (default), only shows the base domain URL with grouped sources.',
+                default: false
+              }
+            }
           },
         },
         {

@@ -58,9 +58,16 @@ export class RemoveDocumentationHandler extends BaseHandler {
               // For absolute paths, exact match
               return storedPath === normalizePathForComparison(p);
             } else {
-              // For relative paths, match at the end of the path
+              // For relative paths:
               const normalizedInput = normalizePathForComparison(p);
-              return storedPath.endsWith('/' + normalizedInput) || storedPath.endsWith(normalizedInput);
+              // 1. Check if it's a direct file match at the end
+              const isExactFileMatch = storedPath.endsWith('/' + normalizedInput);
+              // 2. Check if it's a directory that appears in the path
+              const isDirMatch = storedPath.includes('/' + normalizedInput + '/');
+              // 3. Check if it matches the entire path (for single file case)
+              const isFullMatch = storedPath === normalizedInput;
+              
+              return isExactFileMatch || isDirMatch || isFullMatch;
             }
           });
         });
@@ -70,10 +77,10 @@ export class RemoveDocumentationHandler extends BaseHandler {
           const debugInfo = [
             `\nDebug information:`,
             `- Input paths: ${paths.join(', ')}`,
-            `- Looking for matches where stored path ends with either:`,
+            `- Looking for matches where stored path contains:`,
             ...paths.map(p => {
               const normalizedInput = normalizePathForComparison(p);
-              return `  • /${normalizedInput} or ${normalizedInput}`;
+              return `  • /${normalizedInput}/ (as directory) or /${normalizedInput} (as file)`;
             }),
             `\nAvailable documents in database:`,
             ...(await this.context.qdrantClient.scroll(COLLECTION_NAME, { limit: 10, with_payload: true }))
@@ -81,22 +88,55 @@ export class RemoveDocumentationHandler extends BaseHandler {
                 const url = (p.payload as DocumentPayload).url;
                 const storedPath = normalizePathForComparison(url!.replace('file://', ''));
                 return `  • ${url} (normalized: ${storedPath})`;
-              }),
-            `\nMatching attempts:`,
-            ...(await this.context.qdrantClient.scroll(COLLECTION_NAME, { limit: 10, with_payload: true }))
-              .points.map(p => {
-                const url = (p.payload as DocumentPayload).url;
-                const storedPath = normalizePathForComparison(url!.replace('file://', ''));
-                return paths.map(inputPath => {
-                  const normalizedInput = normalizePathForComparison(inputPath);
-                  return `  • Testing if "${storedPath}" ends with "/${normalizedInput}" or "${normalizedInput}": ${storedPath.endsWith('/' + normalizedInput) || storedPath.endsWith(normalizedInput)}`;
-                }).join('\n');
               })
           ].join('\n');
 
           throw new McpError(
             ErrorCode.InvalidParams,
             `No documents found matching the specified path(s): ${notFoundPaths}${debugInfo}`
+          );
+        }
+
+        // Check for ambiguous directory matches
+        const dirMatches = new Map<string, Set<string>>();
+        
+        for (const record of filteredResults) {
+          const payload = record.payload as DocumentPayload;
+          if (!payload || !payload.url) continue;
+          
+          const storedPath = normalizePathForComparison(payload.url.replace('file://', ''));
+          
+          // For each input path that's not absolute, check if it matches as a directory
+          for (const p of paths) {
+            if (!path.isAbsolute(p)) {
+              const normalizedInput = normalizePathForComparison(p);
+              if (storedPath.includes('/' + normalizedInput + '/')) {
+                // Extract the parent path up to the matching directory
+                const parentPath = storedPath.substring(0, storedPath.indexOf('/' + normalizedInput + '/'));
+                const matches = dirMatches.get(normalizedInput) || new Set();
+                matches.add(parentPath);
+                dirMatches.set(normalizedInput, matches);
+              }
+            }
+          }
+        }
+
+        // Check if any directory name appears in multiple locations
+        const ambiguousDirs = Array.from(dirMatches.entries())
+          .filter(([_, locations]) => locations.size > 1)
+          .map(([dirName, locations]) => ({
+            dirName,
+            locations: Array.from(locations)
+          }));
+
+        if (ambiguousDirs.length > 0) {
+          const errorDetails = ambiguousDirs.map(d => 
+            `\n- "${d.dirName}" found in multiple locations:\n  ${d.locations.map(loc => `• ${loc}/${d.dirName}`).join('\n  ')}`
+          ).join('');
+          
+          throw new McpError(
+            ErrorCode.InvalidParams,
+            `Multiple directories found with the same name. Please use a more specific path to indicate which one to remove:${errorDetails}`
           );
         }
 
@@ -174,7 +214,14 @@ export class RemoveDocumentationHandler extends BaseHandler {
               return normalizePathForComparison(storedPath) === normalizePathForComparison(p);
             } else {
               const normalizedInput = normalizePathForComparison(p);
-              return storedPath.endsWith('/' + normalizedInput) || storedPath.endsWith(normalizedInput);
+              // 1. Check if it's a direct file match at the end
+              const isExactFileMatch = storedPath.endsWith('/' + normalizedInput);
+              // 2. Check if it's a directory that appears in the path
+              const isDirMatch = storedPath.includes('/' + normalizedInput + '/');
+              // 3. Check if it matches the entire path (for single file case)
+              const isFullMatch = storedPath === normalizedInput;
+              
+              return isExactFileMatch || isDirMatch || isFullMatch;
             }
           });
           return matchingInputPath || storedPath;
