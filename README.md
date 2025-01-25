@@ -225,37 +225,126 @@ With OpenAI:
 
 1. `add_url_documentation`
    - Add documentation from a URL to the RAG database
+   - Automatically extracts meaningful content while removing boilerplate elements
    - Parameters:
-     - `url`: URL of the documentation to fetch
+     - `url` (required): Complete URL of the documentation to fetch (must include protocol)
 
-2. `search_documentation`
-   - Search through stored documentation
+2. `add_local_documentation`
+   - Add documentation from local files or directories
+   - Supports recursive directory processing
    - Parameters:
-     - `query`: Search query
-     - `limit` (optional): Maximum number of results to return (default: 5)
+     - `path` (required): Absolute path to the file or directory to process
 
-3. `list_sources`
-   - List all documentation sources currently stored
+3. `search_documentation`
+   - Search through stored documentation using natural language queries
+   - Returns ranked results with context
+   - Parameters:
+     - `query` (required): Search query text
+     - `limit` (optional): Maximum results to return (1-20, default: 5)
+
+4. `list_sources`
+   - List all documentation sources with hierarchical organization
+   - Shows both web and local documentation sources
+   - Parameters:
+     - `expanded` (optional): Show detailed URL listings under each domain (default: false)
+
+5. `extract_urls`
+   - Extract and analyze URLs from a webpage
+   - Can automatically add discovered URLs to the processing queue
+   - Parameters:
+     - `url` (required): URL to analyze
+     - `add_to_queue` (optional): Add extracted URLs to queue (default: false)
+
+6. `check_files`
+   - Scan local filesystem and list all supported files
+   - Can add found files to the processing queue
+   - Parameters:
+     - `path` (required): Path to scan
+     - `add_to_queue` (optional): Add found files to queue (default: false)
+
+7. `wipe_database`
+   - Remove all stored documentation
+   - Reinitializes empty collections
    - No parameters required
+
+8. `remove_documentation`
+   - Remove specific documentation from the database
+   - Supports both URLs and file paths
+   - Parameters:
+     - `paths` (required): Array of paths to remove
+
+9. `list_queue`
+   - Show pending items in the documentation processing queue
+   - Displays queue contents with status
+   - No parameters required
+
+10. `run_queue`
+    - Process all items in the documentation queue
+    - Supports batch processing with retry logic
+    - Parameters:
+      - `maxConcurrent` (optional): Max parallel items (1-5, default: 3)
+      - `retryAttempts` (optional): Number of retries (0-5, default: 3)
+      - `retryDelay` (optional): Delay between retries in ms (1000-10000, default: 1000)
+      - `batchSize` (optional): Chunk batch size (1-100, default: 20)
+
+11. `clear_queue`
+    - Remove all items from the processing queue
+    - Immediate and permanent operation
+    - No parameters required
+
+12. `remove_from_queue`
+    - Remove specific items from the processing queue
+    - Provides suggestions for case-insensitive matches
+    - Parameters:
+      - `paths` (required): Array of URLs or file paths to remove
 
 ## Example Usage
 
 In Claude Desktop or any other MCP-compatible client:
 
-1. Add documentation:
+1. Add web documentation:
 ```
 Add this documentation: https://docs.example.com/api
 ```
 
-2. Search documentation:
+2. Add local documentation:
 ```
-Search the documentation for information about authentication
+Add documentation from this folder: C:\Users\YourName\Documents\ProjectDocs
 ```
 
-3. List sources:
+3. Search documentation:
 ```
-What documentation sources are available?
+Search the documentation for: how to implement authentication
 ```
+
+4. List current sources:
+```
+Show me all documentation sources
+```
+
+5. Queue management:
+```
+Extract URLs from: https://docs.example.com/api
+List the current queue
+Run the queue with 3 concurrent items
+Clear the queue
+```
+
+6. Remove documentation:
+```
+Remove documentation: docs/outdated-guide.md
+```
+
+## Supported File Types
+
+The following file extensions are supported for local documentation:
+- Markdown: `.md`, `.mdx`, `.markdown`
+- Text: `.txt`
+- Source code: `.js`, `.jsx`, `.ts`, `.tsx`, `.py`, `.java`, `.c`, `.cpp`, `.h`, `.hpp`
+- Configuration: `.json`, `.yaml`, `.yml`, `.xml`, `.conf`, `.ini`
+- Web: `.html`, `.htm`, `.css`
+- Scripts: `.sh`, `.bash`, `.zsh`, `.ps1`, `.bat`, `.cmd`
+- Other: `.sql`, `.log`
 
 ## Development
 
@@ -282,7 +371,7 @@ npm start
 
 ## License
 
-MIT
+APACHE 2.0
 
 ## Contributing
 

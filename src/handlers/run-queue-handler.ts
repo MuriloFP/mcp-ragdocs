@@ -1,12 +1,21 @@
 import { BaseHandler } from './base-handler.js';
-import fs from 'fs/promises';
-import path from 'path';
+import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { AddUrlDocumentationHandler } from './add-url-documentation-handler.js';
 import { AddLocalDocumentationHandler } from './add-local-documentation-handler.js';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 
-const QUEUE_FILE = path.join(process.cwd(), 'queue.txt');
+const QUEUE_FILE = 'queue.txt';
+const PROCESSING_FILE = 'processing.txt';
 
 interface ProcessResult {
+  item: string;
+  success: boolean;
+  error?: string;
+  attempts: number;
+}
+
+interface QueueStats {
   completed: number;
   failed: number;
   errors: Array<{
@@ -18,42 +27,117 @@ interface ProcessResult {
 }
 
 export class RunQueueHandler extends BaseHandler {
-  private addUrlHandler: AddUrlDocumentationHandler;
-  private addLocalHandler: AddLocalDocumentationHandler;
+  private urlHandler: AddUrlDocumentationHandler;
+  private localHandler: AddLocalDocumentationHandler;
 
   constructor(context: any) {
     super(context);
-    this.addUrlHandler = new AddUrlDocumentationHandler(context);
-    this.addLocalHandler = new AddLocalDocumentationHandler(context);
+    this.urlHandler = new AddUrlDocumentationHandler(context);
+    this.localHandler = new AddLocalDocumentationHandler(context);
   }
 
   private isWebUrl(str: string): boolean {
     try {
       const url = new URL(str);
-      // Only consider it a web URL if it uses http/https protocol
       return url.protocol === 'http:' || url.protocol === 'https:';
     } catch {
       return false;
     }
   }
 
-  private formatResult(result: ProcessResult): string {
-    const elapsed = Math.floor((Date.now() - result.startTime) / 1000);
-    const minutes = Math.floor(elapsed / 60);
-    const seconds = elapsed % 60;
-    
-    let output = `⏱️ Total processing time: ${minutes}m ${seconds}s\n`;
-    output += `✅ Completed: ${result.completed}\n`;
-    output += `❌ Failed: ${result.failed}\n`;
-    
-    if (result.errors.length > 0) {
-      output += '\n⚠️ Failed items:\n';
-      output += result.errors.map(e => 
-        `  • ${e.item} (${e.attempts} attempt${e.attempts !== 1 ? 's' : ''}): ${e.error}`
-      ).join('\n');
+  private async delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  private async processItem(item: string, retryAttempts: number, retryDelay: number): Promise<ProcessResult> {
+    let lastError: Error | undefined;
+    let attempts = 0;
+
+    while (attempts < retryAttempts) {
+      attempts++;
+      try {
+        if (this.isWebUrl(item)) {
+          await this.urlHandler.handle({ url: item });
+        } else {
+          // For local files, first verify they exist
+          try {
+            await fs.access(item);
+            await this.localHandler.handle({ path: item });
+          } catch (error) {
+            throw new McpError(
+              ErrorCode.InvalidParams,
+              `File not accessible: ${item} - ${error instanceof Error ? error.message : String(error)}`
+            );
+          }
+        }
+        return { item, success: true, attempts };
+      } catch (error) {
+        lastError = error as Error;
+        console.error(`Attempt ${attempts} failed for ${item}:`, error);
+        if (attempts < retryAttempts) {
+          await this.delay(retryDelay);
+        }
+      }
     }
 
-    return output;
+    return {
+      item,
+      success: false,
+      error: String(lastError?.message || 'Unknown error'),
+      attempts
+    };
+  }
+
+  private async processBatch(items: string[], retryAttempts: number, retryDelay: number): Promise<ProcessResult[]> {
+    return Promise.all(
+      items.map(item => this.processItem(item, retryAttempts, retryDelay))
+    );
+  }
+
+  private async updateProcessingItems(items: string[]): Promise<void> {
+    await fs.writeFile(PROCESSING_FILE, items.join('\n'));
+  }
+
+  private async removeFromProcessing(items: string[]): Promise<void> {
+    try {
+      const processing = await fs.readFile(PROCESSING_FILE, 'utf-8');
+      const currentItems = processing.split('\n').filter(Boolean);
+      const remainingItems = currentItems.filter(item => !items.includes(item));
+      
+      if (remainingItems.length > 0) {
+        await fs.writeFile(PROCESSING_FILE, remainingItems.join('\n'));
+      } else {
+        await fs.unlink(PROCESSING_FILE);
+      }
+    } catch (error) {
+      // Ignore if file doesn't exist
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw error;
+      }
+    }
+  }
+
+  private formatResults(stats: QueueStats): string {
+    const endTime = Date.now();
+    const duration = endTime - stats.startTime;
+    const minutes = Math.floor(duration / 60000);
+    const seconds = ((duration % 60000) / 1000).toFixed(0);
+    
+    const lines = [
+      `⏱️ Processing completed in: ${minutes}m ${seconds}s`,
+      `✅ Successfully processed: ${stats.completed}`,
+      `❌ Failed: ${stats.failed}`
+    ];
+
+    if (stats.errors.length > 0) {
+      lines.push('', '📋 Failed items:');
+      stats.errors.forEach(result => {
+        lines.push(`  • ${result.item}`);
+        lines.push(`    (${result.attempts} attempts: ${result.error})`);
+      });
+    }
+
+    return lines.join('\n');
   }
 
   async handle(args: Record<string, unknown>) {
@@ -62,105 +146,74 @@ export class RunQueueHandler extends BaseHandler {
       const retryAttempts = Math.min(Number(args.retryAttempts) || 3, 5);
       const retryDelay = Math.min(Number(args.retryDelay) || 1000, 10000);
 
-      const result: ProcessResult = {
+      const stats: QueueStats = {
         completed: 0,
         failed: 0,
         errors: [],
         startTime: Date.now()
       };
 
-      // Check if queue file exists
+      // Read queue file
+      let queueContents: string;
       try {
-        await fs.access(QUEUE_FILE);
-      } catch {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: 'Queue is empty (queue file does not exist)',
-            },
-          ],
-        };
+        queueContents = await fs.readFile(QUEUE_FILE, 'utf-8');
+      } catch (error) {
+        throw new McpError(ErrorCode.InvalidRequest, 'Queue is empty');
       }
 
-      while (true) {
-        // Read current queue
-        const content = await fs.readFile(QUEUE_FILE, 'utf-8');
-        const items = content.split('\n').filter(item => item.trim() !== '');
+      let items = queueContents.split('\n').filter(Boolean);
+      if (items.length === 0) {
+        throw new McpError(ErrorCode.InvalidRequest, 'Queue is empty');
+      }
 
-        if (items.length === 0) {
-          break; // Queue is empty
+      // Process items in batches
+      while (items.length > 0) {
+        const batch = items.slice(0, maxConcurrent);
+        await this.updateProcessingItems(batch);
+
+        console.log(`Processing batch of ${batch.length} items...`);
+        const batchResults = await this.processBatch(batch, retryAttempts, retryDelay);
+        
+        // Update stats
+        for (const result of batchResults) {
+          if (result.success) {
+            stats.completed++;
+          } else {
+            stats.failed++;
+            stats.errors.push({
+              item: result.item,
+              error: result.error || 'Unknown error',
+              attempts: result.attempts
+            });
+          }
         }
 
-        // Take up to maxConcurrent items
-        const batch = items.slice(0, maxConcurrent);
-        
-        try {
-          // Process items in parallel
-          const batchResults = await Promise.all(
-            batch.map(async item => {
-              let lastError: Error | null = null;
-              let attempts = 0;
-              
-              for (let attempt = 1; attempt <= retryAttempts; attempt++) {
-                attempts = attempt;
-                try {
-                  if (this.isWebUrl(item)) {
-                    await this.addUrlHandler.handle({ url: item });
-                  } else {
-                    await fs.access(item);
-                    await this.addLocalHandler.handle({ path: item });
-                  }
-                  return { success: true, item };
-                } catch (error) {
-                  lastError = error as Error;
-                  if (attempt < retryAttempts) {
-                    await new Promise(resolve => setTimeout(resolve, retryDelay));
-                  }
-                }
-              }
-              
-              return { 
-                success: false, 
-                item, 
-                error: String(lastError?.message || 'Unknown error'),
-                attempts: attempts || 1
-              };
-            })
-          );
+        // Remove processed items from queue and processing
+        items = items.slice(maxConcurrent);
+        await this.removeFromProcessing(batch);
 
-          // Update counts and track failures
-          for (const batchResult of batchResults) {
-            if (batchResult.success) {
-              result.completed++;
-            } else {
-              result.failed++;
-              result.errors.push({
-                item: batchResult.item,
-                error: batchResult.error || 'Unknown error',
-                attempts: batchResult.attempts || 1
-              });
-            }
-          }
-
-          // Remove processed items from queue
-          const remainingItems = items.slice(batch.length);
-          await fs.writeFile(QUEUE_FILE, remainingItems.join('\n') + (remainingItems.length > 0 ? '\n' : ''));
-        } catch (error) {
-          throw error;
+        // Update queue file
+        if (items.length > 0) {
+          await fs.writeFile(QUEUE_FILE, items.join('\n'));
+        } else {
+          await fs.unlink(QUEUE_FILE);
         }
       }
 
       return {
-        content: [
-          {
-            type: 'text',
-            text: this.formatResult(result),
-          },
-        ],
+        content: [{
+          type: 'text',
+          text: this.formatResults(stats)
+        }]
       };
     } catch (error) {
-      return this.formatErrorResponse(error);
+      if (error instanceof McpError) {
+        throw error;
+      }
+      throw new McpError(
+        ErrorCode.InternalError,
+        `Failed to process queue: ${(error as Error).message}`
+      );
     }
   }
 } 

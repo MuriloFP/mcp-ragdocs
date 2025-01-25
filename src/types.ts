@@ -67,6 +67,7 @@ export interface HandlerContext {
   server: Server;
   qdrantClient: QdrantClient;
   getEmbeddings: (text: string) => Promise<number[]>;
+  getBatchEmbeddings: (texts: string[]) => Promise<number[][]>;
   apiClient: {
     fetchAndProcessUrl: (url: string) => Promise<DocumentChunk[]>;
     processLocalFile: (filePath: string) => Promise<DocumentChunk[]>;

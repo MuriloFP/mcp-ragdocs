@@ -35,6 +35,7 @@ export class HandlerRegistry {
       server,
       qdrantClient: apiClient.getQdrantClient(),
       getEmbeddings: (text: string) => apiClient.getEmbeddings(text),
+      getBatchEmbeddings: (texts: string[]) => Promise.all(texts.map(text => apiClient.getEmbeddings(text))),
       apiClient: {
         fetchAndProcessUrl: (url: string) => apiClient.fetchAndProcessUrl(url),
         processLocalFile: (filePath: string) => apiClient.processLocalFile(filePath),
