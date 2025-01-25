@@ -1,7 +1,7 @@
 # MCP-Ragdocs
 
 > This project incorporates code from:
-> - [mcp-ragdocs](https://github.com/qpd-v/mcp-ragdocs) (Apache License 2.0)
+> - [mcp-ragdocs](https://github.com/MuriloFP/mcp-ragdocs) (Apache License 2.0)
 > - [hannesrudolph/mcp-ragdocs](https://github.com/hannesrudolph/mcp-ragdocs) (MIT License)
 >
 > Enhanced with improved architecture, error handling, and new features. See the [NOTICE](NOTICE) file for details about modifications and original attribution.
@@ -24,7 +24,7 @@ Current version: 0.1.6
 Install globally using npm:
 
 ```bash
-npm install -g @qpd-v/mcp-server-ragdocs
+npm install -g mcp-server-ragdocs
 ```
 
 This will install the server in your global npm directory, which you'll need for the configuration steps below.
@@ -69,7 +69,7 @@ Add to your Cline settings file (`%AppData%\Code\User\globalStorage\rooveterinar
 		"mcpServers": {
 				"ragdocs": {
 						"command": "node",
-      "args": ["C:/Users/YOUR_USERNAME/AppData/Roaming/npm/node_modules/@qpd-v/mcp-server-ragdocs/build/index.js"],
+      "args": ["C:/Users/YOUR_USERNAME/AppData/Roaming/npm/node_modules/mcp-server-ragdocs/build/index.js"],
       "env": {
         "QDRANT_URL": "http://127.0.0.1:6333",
         "EMBEDDING_PROVIDER": "ollama",
@@ -86,7 +86,7 @@ For OpenAI instead of Ollama:
 		"mcpServers": {
 				"ragdocs": {
 						"command": "node",
-      "args": ["C:/Users/YOUR_USERNAME/AppData/Roaming/npm/node_modules/@qpd-v/mcp-server-ragdocs/build/index.js"],
+      "args": ["C:/Users/YOUR_USERNAME/AppData/Roaming/npm/node_modules/mcp-server-ragdocs/build/index.js"],
       "env": {
         "QDRANT_URL": "http://127.0.0.1:6333",
         "EMBEDDING_PROVIDER": "openai",
@@ -127,7 +127,7 @@ Add to your Claude Desktop config file:
     "ragdocs": {
       "command": "C:\\Program Files\\nodejs\\node.exe",
       "args": [
-        "C:\\Users\\YOUR_USERNAME\\AppData\\Roaming\\npm\\node_modules\\@qpd-v/mcp-server-ragdocs\\build\\index.js"
+        "C:\\Users\\YOUR_USERNAME\\AppData\\Roaming\\npm\\node_modules\\mcp-server-ragdocs\\build\\index.js"
       ],
       "env": {
 								"QDRANT_URL": "http://127.0.0.1:6333",
@@ -146,7 +146,7 @@ Windows Setup with OpenAI:
 				"ragdocs": {
 						"command": "C:\\Program Files\\nodejs\\node.exe",
 						"args": [
-								"C:\\Users\\YOUR_USERNAME\\AppData\\Roaming\\npm\\node_modules\\@qpd-v/mcp-server-ragdocs\\build\\index.js"
+								"C:\\Users\\YOUR_USERNAME\\AppData\\Roaming\\npm\\node_modules\\mcp-server-ragdocs\\build\\index.js"
 						],
 						"env": {
 								"QDRANT_URL": "http://127.0.0.1:6333",
@@ -165,7 +165,7 @@ Windows Setup with OpenAI:
 				"ragdocs": {
 						"command": "/usr/local/bin/node",
 						"args": [
-								"/usr/local/lib/node_modules/@qpd-v/mcp-server-ragdocs/build/index.js"
+								"/usr/local/lib/node_modules/mcp-server-ragdocs/build/index.js"
 						],
 						"env": {
 								"QDRANT_URL": "http://127.0.0.1:6333",
@@ -350,7 +350,7 @@ The following file extensions are supported for local documentation:
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/qpd-v/mcp-server-ragdocs.git
+git clone https://github.com/MuriloFP/mcp-server-ragdocs.git
 cd mcp-server-ragdocs
 ```
 
